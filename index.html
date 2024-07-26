@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Back-End Task</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>Back-End Task</h1>
+
+    <form id="api-form">
+
+        <label for="times">Number of Times: </label>
+        <input type="number" name="times" id="times" placeholder="5" required>
+
+        <fieldset class="formatSection">
+            <legend>Choose Format</legend>
+            <label for="format-json">
+                <input type="radio" name="format" id="format-json" value="json" required> JSON
+            </label>
+            <label for="format-csv">
+                <input type="radio" name="format" id="format-csv" value="csv" required> CSV
+            </label>
+            <label for="format-console">
+                <input type="radio" name="format" id="format-console" value="console" required> Console Log
+            </label>
+        </fieldset>
+
+        <button type="submit" class="saveButton">Save</button>
+
+    </form>
+
+    <script>
+        document.getElementById('api-form').addEventListener('submit', async function(event) {
+            event.preventDefault();
+
+            const times = parseInt(document.getElementById('times').value, 10);
+            const format = document.querySelector('input[name="format"]:checked').value;
+
+            if (isNaN(times) || times <= 0) {
+                alert('Please enter a valid number of times.');
+                return;
+            }
+
+            try {
+                const responses = await Promise.all(
+                    Array.from({ length: times }, () => fetch('https://bored-api.appbrewery.com/random'))
+                );
+
+                // Check if any of the responses are 429 (Too Many Requests)
+                const statusCheck = responses.find(response => response.status === 429);
+                if (statusCheck) {
+                    throw new Error('Too Many Requests - Please try again later.');
+                }
+
+                const data = await Promise.all(responses.map(response => response.json()));
+
+                switch (format) {
+                    case 'json':
+                        downloadFile('Random Activities.json', JSON.stringify(data, null, 2), 'application/json');
+                        break;
+                    case 'csv':
+                        const csv = [
+                            'activity,availability,type,participants,price,accessibility,duration,kidFriendly,link,key',
+                            ...data.map(item => 
+                                `"${item.activity.replace(/"/g, '""')}",${item.availability},${item.type},${item.participants},${item.price},"${item.accessibility.replace(/"/g, '""')}",${item.duration},${item.kidFriendly},${item.link},"${item.key}"`
+                            )
+                        ].join('\n');
+                        downloadFile('Random Activities.csv', csv, 'text/csv');
+                        break;
+                    case 'console':
+                        console.log(data);
+                        alert('Check console for the output.');
+                        break;
+                }
+            } catch (error) {
+                if (error.message === 'Too Many Requests - Please try again later.') {
+                    alert(error.message);
+                } else {
+                    console.error('Error fetching data:', error);
+                    alert('An error occurred while fetching data.');
+                }
+            }
+        });
+
+        function downloadFile(filename, content, mimeType) {
+            const blob = new Blob([content], { type: mimeType });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>
